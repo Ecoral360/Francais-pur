@@ -63,12 +63,10 @@ decimal =
     ]
 
 texte =
-  between (string "« ") (string " »") $
-    many $
-      choice [espace >> satisfy (/= '»'), satisfy (/= ' ')]
+  between (string "« ") (string "»") $ many $ satisfy (/= '»')
 
-caractere = 
-  choice 
+caractere =
+  choice
     [ ' ' <$ symbole "espace",
       '\n' <$ symbole "nouvelle ligne",
       '\t' <$ symbole "tabulation",
@@ -227,6 +225,7 @@ frEvalExpr env (FrExCarPosition exprTxt exprIdx) = do
    in if idx > maxIdx
         then Left $ FrErrIndex (FrTexte txt) idx maxIdx
         else Right $ FrCaractere $ txt !! (idx - 1)
+
 frEval :: FrEnv -> FrPhrase -> Either FrError (FrEnv, IO ())
 frEval env (FrPhImprimer expr) = do
   result <- frEvalExpr env expr

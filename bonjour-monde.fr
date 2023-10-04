@@ -1,0 +1,4 @@
+Posons que Salutation vaut « Bonjour, monde ! ».
+
+Imprimer Salutation.
+

@@ -1,0 +1,13 @@
+#!/bin/sh
+
+
+case "$1" in
+"rouler")
+    shift
+	{
+		echo "import Francais"
+		printf "runFr \"%s\"" "$(sed -z 's/\n//g' "$1")"
+	} | cabal repl -v0
+	;;
+esac
+
