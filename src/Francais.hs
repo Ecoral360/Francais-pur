@@ -50,13 +50,13 @@ frChiffre = choice [frChiffreSingulier, frChiffrePluriel]
 
 entier =
   collect
-    [ ("-" <$ symMoins) <|$> "",
+    [ ("-" <$ symbole "moins") <|$> "",
       frChiffre
     ]
 
 decimal =
   collect
-    [ ("-" <$ symMoins) <|$> "",
+    [ ("-" <$ symbole "moins") <|$> "",
       some chiffre,
       "." <$ choice [string ",", symbole "virgule"],
       some chiffre
@@ -127,6 +127,9 @@ frObj =
 data FrExpr
   = FrExConst FrObj
   | FrExPlus FrExpr FrExpr
+  | FrExMoins FrExpr FrExpr
+  | FrExFois FrExpr FrExpr
+  | FrExSur FrExpr FrExpr -- division
   | FrExIndex FrExpr FrExpr
   | FrExPosition FrExpr FrExpr
   | FrExCarIndex FrExpr FrExpr
@@ -135,7 +138,10 @@ data FrExpr
 
 frExpr =
   choice
-    [ FrExPlus <$> (FrExConst <$> frObj) <*> (symPlus *> frExpr),
+    [ FrExPlus <$> (FrExConst <$> frObj) <*> (symbole "plus" *> frExpr),
+      FrExMoins <$> (FrExConst <$> frObj) <*> (symbole "moins" *> frExpr),
+      FrExFois <$> (FrExConst <$> frObj) <*> (symbole "fois" *> frExpr),
+      FrExSur <$> (FrExConst <$> frObj) <*> (symbole "sur" *> frExpr),
       FrExIndex <$> (symbole "élément de" *> frExpr) <*> (symbole "à l'index" *> frExpr),
       FrExPosition <$> (symbole "élément de" *> frExpr) <*> (symbole "à la position" *> frExpr),
       FrExCarIndex <$> (symbole "caractère de" *> frExpr) <*> (symbole "à l'index" *> frExpr),
@@ -155,14 +161,22 @@ frPhrase =
     ]
     <* symbole "."
 
-frPlus :: FrObj -> FrObj -> Either FrError FrObj
-frPlus g (FrTexte s) = pure . FrTexte $ frToString g ++ s
-frPlus (FrTexte s) d = pure . FrTexte $ s ++ frToString d
-frPlus (FrEntier g) (FrEntier d) = pure . FrEntier $ g + d
-frPlus (FrDecimal g) (FrDecimal d) = pure . FrDecimal $ g + d
-frPlus (FrEntier g) (FrDecimal d) = pure . FrDecimal $ int2Double g + d
-frPlus (FrDecimal g) (FrEntier d) = pure . FrDecimal $ g + int2Double d
-frPlus g d = Left $ FrErrBinOp "plus" g d
+frBinOp :: String -> (Double -> Double -> Double) -> FrObj -> FrObj -> Either FrError FrObj
+frBinOp opName op g (FrTexte s) = pure . FrTexte $ frToString g ++ s
+frBinOp opName op (FrTexte s) d = pure . FrTexte $ s ++ frToString d
+frBinOp opName op (FrEntier g) (FrEntier d) = pure . FrEntier $ double2Int $ int2Double g `op` int2Double d
+frBinOp opName op (FrDecimal g) (FrDecimal d) = pure . FrDecimal $ g `op` d
+frBinOp opName op (FrEntier g) (FrDecimal d) = pure . FrDecimal $ int2Double g `op` d
+frBinOp opName op (FrDecimal g) (FrEntier d) = pure . FrDecimal $ g `op` int2Double d
+frBinOp opName op g d = Left $ FrErrBinOp opName g d
+
+frPlus = frBinOp "plus" (+)
+
+frMoins = frBinOp "moins" (-)
+
+frFois = frBinOp "fois" (*)
+
+frDiv = frBinOp "sur" (/)
 
 frEvalExpr :: FrEnv -> FrExpr -> Either FrError FrObj
 frEvalExpr env (FrExConst (FrIdent var)) = case Data.Map.lookup var env of
@@ -173,6 +187,18 @@ frEvalExpr env (FrExPlus exprG exprD) = do
   g <- frEvalExpr env exprG
   d <- frEvalExpr env exprD
   frPlus g d
+frEvalExpr env (FrExMoins exprG exprD) = do
+  g <- frEvalExpr env exprG
+  d <- frEvalExpr env exprD
+  frMoins g d
+frEvalExpr env (FrExFois exprG exprD) = do
+  g <- frEvalExpr env exprG
+  d <- frEvalExpr env exprD
+  frFois g d
+frEvalExpr env (FrExSur exprG exprD) = do
+  g <- frEvalExpr env exprG
+  d <- frEvalExpr env exprD
+  frDiv g d
 frEvalExpr env (FrExIndex exprTab exprIdx) = do
   tab <-
     frEvalExpr env exprTab >>= \case
@@ -366,7 +392,3 @@ symDefFonction = symbole "Début de la définition de la fonction nommée"
 symFinFonction = symbole "Fin de la définition de la fonction"
 
 symAppeler = symbole "Appeler"
-
-symPlus = symbole "plus"
-
-symMoins = symbole "moins"
