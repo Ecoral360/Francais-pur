@@ -1,5 +1,5 @@
 Posons que X vaut cinq.
 
-Posons que Y vaut trois.
+Posons que Y vaut quatre.
 
-Imprimer X fois Y.
+Imprimer moins X plus Y.

@@ -100,6 +100,13 @@ between open close p = open *> p <* close
 collect :: [Parser i [a]] -> Parser i [a]
 collect = foldr (\x acc -> (<>) <$> x <*> acc) $ pure []
 
+manyUntil :: (Eq i) => Parser i a -> Parser i b -> Parser i [b]
+manyUntil stop repeated =
+  choice
+    [ [] <$ stop,
+      (:) <$> repeated <*> manyUntil stop repeated
+    ]
+
 -- |
 -- Returns a parser with a default value if it didn't parse
 (<|$>) :: (Eq i) => Parser i a -> a -> Parser i a

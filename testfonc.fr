@@ -1,0 +1,10 @@
+Début de la définition de la fonction nommée Foo acceptant le paramètre Bar.
+  Imprimer Bar.
+  Retourner Bar plus trois.
+Fin de la définition de la fonction.
+
+Imprimer dix.
+Posons que N vaut l'appel à la fonction Foo avec l'argument cinq.
+Imprimer N.
+Appeler la fonction Foo avec l'argument seize.
+
