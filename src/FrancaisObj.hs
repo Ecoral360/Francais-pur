@@ -102,3 +102,5 @@ data FrPhrase
   | FrPhSachantQueMaintenant FrVar FrExpr [FrPhrase]
   | FrPhSi FrExpr [FrPhrase] [FrPhrase]
   | FrPhTantQue FrExpr [FrPhrase]
+  | FrPhPourChaqueCar FrVar FrExpr [FrPhrase]
+  | FrPhPourChaqueEl FrVar FrExpr [FrPhrase]

@@ -5,7 +5,7 @@ import Control.Monad (join)
 import Data.Char (isDigit, isLetter, isSpace, isUpper, isUpperCase)
 import Data.Either (rights)
 import Data.Functor
-import Data.Map (Map, empty, insert, lookup, member, notMember)
+import Data.Map (Map, delete, empty, insert, lookup, member, notMember)
 import Data.Maybe (fromMaybe, mapMaybe)
 import FrancaisObj
 import FrancaisParse
@@ -203,7 +203,7 @@ frEval env (FrPhSachantQue var expr corps) = do
     then
       let sachantEnv = insert var value env
        in case execPh sachantEnv corps of
-            (Right _, io') -> pure (env, io >> applyFrIO io')
+            (Right nouvelEnv, io') -> pure (delete var nouvelEnv, io >> applyFrIO io')
             (Left err, _) -> Left err
     else Left $ FrErrDecl var "La variable a déjà été déclarée."
 frEval env (FrPhSachantQueMaintenant var expr corps) = do
@@ -212,7 +212,7 @@ frEval env (FrPhSachantQueMaintenant var expr corps) = do
     then
       let sachantEnv = insert var value env
        in case execPh sachantEnv corps of
-            (Right _, io') -> pure (env, io >> applyFrIO io')
+            (Right nouvelEnv, io') -> pure (delete var nouvelEnv, io >> applyFrIO io')
             (Left err, _) -> Left err
     else Left $ FrErrDecl var "La variable n'a pas été déclarée."
 
@@ -272,6 +272,24 @@ frEval env boucle@(FrPhTantQue condExpr corps) = do
         (Right nouvelEnv, ios) -> Right (nouvelEnv, io >> applyFrIO ios)
         (Left err, io) -> Left err
     (FrBool False) -> Right (env, io)
+frEval env (FrPhPourChaqueCar var expr corps) = do
+  (texte, io) <- frEvalExpr env expr
+  case texte of
+    (FrTexte (c : reste)) ->
+      let pourchaqueEnv = insert var (FrCaractere c) env
+       in case execPh pourchaqueEnv $ corps ++ [FrPhPourChaqueCar var (FrExConst $ FrTexte reste) corps] of
+            (Right nouvelEnv, ios) -> Right (nouvelEnv, io >> applyFrIO ios)
+            (Left err, io) -> Left err
+    (FrTexte []) -> Right (delete var env, io)
+frEval env (FrPhPourChaqueEl var expr corps) = do
+  (tab, io) <- frEvalExpr env expr
+  case tab of
+    (FrTableau (e : reste)) ->
+      let pourchaqueEnv = insert var e env
+       in case execPh pourchaqueEnv $ corps ++ [FrPhPourChaqueEl var (FrExConst $ FrTableau reste) corps] of
+            (Right nouvelEnv, ios) -> Right (nouvelEnv, io >> applyFrIO ios)
+            (Left err, io) -> Left err
+    (FrTableau []) -> Right (delete var env, io)
 
 parse s = runParser frExpr s 0
 
@@ -316,6 +334,7 @@ frToString (FrBool v)
   | v = "Vrai"
   | otherwise = "Faux"
 frToString (FrTexte s) = s
+frToString (FrCaractere c) = "le caractère " ++ [c]
 frToString (FrEntier i) =
   ( if i < 0 && i > -16
       then "moins "

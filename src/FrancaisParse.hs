@@ -200,6 +200,14 @@ frPhraseIncomplete =
       FrPhTantQue
         <$> (symbole "tant que" *> frExpr <* symbole ",")
         <*> frPhEnumeration,
+      FrPhPourChaqueCar
+        <$> (symbole "pour chaque caractère" *> nomVar)
+        <*> (symbole "dans" *> frExpr <* symbole ",")
+        <*> frPhEnumeration,
+      FrPhPourChaqueEl
+        <$> (symbole "pour chaque élément" *> nomVar)
+        <*> (symbole "dans" *> frExpr <* symbole ",")
+        <*> frPhEnumeration,
       FrPhDefFonction
         <$> (symbole "début de la définition de la fonction nommée" *> nomVar)
         <*> ( choice
