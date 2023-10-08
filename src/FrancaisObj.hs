@@ -104,3 +104,6 @@ data FrPhrase
   | FrPhTantQue FrExpr [FrPhrase]
   | FrPhPourChaqueCar FrVar FrExpr [FrPhrase]
   | FrPhPourChaqueEl FrVar FrExpr [FrPhrase]
+
+data FrMeta
+  = FrMetaInclure [FrVar] String

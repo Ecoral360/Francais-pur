@@ -80,11 +80,7 @@ nomVar =
         many $ choice [lettre, chiffre]
       ]
 
-enumNomVar =
-  collect
-    [ sepBy nomVar (symbole ","),
-      symbole "et" *> nomVar <&> (: [])
-    ]
+enumNomVar = frEnumeration nomVar
 
 symbole s = espaces *> string s <* espaces
 
@@ -100,13 +96,17 @@ frObj =
       FrIdent <$> nomVar
     ]
 
-frEnumeration =
+frEnumeration p =
   collect
-    [ sepBy frExpr (symbole ","),
-      symbole "et" *> frExpr <&> (: [])
+    [ sepBy p (symbole ","),
+      symbole "et" *> p <&> (: [])
     ]
 
-frPhEnumeration =
+frExEnum = frEnumeration frExpr
+
+frPhEnum = frEnumeration frPhraseIncomplete
+
+frMetaEnumeration =
   collect
     [ sepBy frPhraseIncomplete (symbole ","),
       symbole "et" *> frPhraseIncomplete <&> (: [])
@@ -120,7 +120,7 @@ frExprUnaire =
           [ [] <$ symbole "un tableau vide",
             symbole "un tableau contenant seulement" *> frExpr <&> (: []),
             symbole "un tableau contenant"
-              *> frEnumeration
+              *> frExEnum
           ],
       FrExConst <$> frObj,
       FrExMoinsUn <$> (symbole "moins" *> frExprUnaire)
@@ -147,11 +147,11 @@ frExpr =
             FrExPlusEq gauche <$> (symbole "vaut plus ou autant que" *> frExpr)
           ],
       -- arithmétique variadique
-      FrExSomme <$> (symbole "la somme de" *> frEnumeration),
-      FrExDiff <$> (symbole "la différence entre" *> frEnumeration),
-      FrExProduit <$> (symbole "le produit de" *> frEnumeration),
-      FrExQuotient <$> (symbole "le quotient de" *> frEnumeration),
-      FrExConcat <$> (symbole "la concaténation de" *> frEnumeration),
+      FrExSomme <$> (symbole "la somme de" *> frExEnum),
+      FrExDiff <$> (symbole "la différence entre" *> frExEnum),
+      FrExProduit <$> (symbole "le produit de" *> frExEnum),
+      FrExQuotient <$> (symbole "le quotient de" *> frExEnum),
+      FrExConcat <$> (symbole "la concaténation de" *> frExEnum),
       -- indexation
       FrExIndex <$> (symbole "élément de" *> frExpr) <*> (symbole "à l'index" *> frExpr),
       FrExPosition <$> (symbole "élément de" *> frExpr) <*> (symbole "à la position" *> frExpr),
@@ -162,7 +162,7 @@ frExpr =
         <$> (symbole "l'appel à la fonction" *> frExpr)
         <*> choice
           [ (symbole "avec l'argument" *> frExpr) <&> (: []),
-            symbole "avec les arguments" *> frEnumeration
+            symbole "avec les arguments" *> frExEnum
           ],
       -- autre
       frExprUnaire
@@ -177,37 +177,37 @@ frPhraseIncomplete =
         <$> (symbole "appeler la fonction" *> frExpr)
         <*> choice
           [ (symbole "avec l'argument" *> frExpr) <&> (: []),
-            symbole "avec les arguments" *> frEnumeration
+            symbole "avec les arguments" *> frExEnum
           ],
       FrPhAppelerProc
         <$> (symbole "appeler la procédure" *> frExpr)
         <*> choice
           [ (symbole "avec l'argument" *> frExpr) <&> (: []),
-            symbole "avec les arguments" *> frEnumeration
+            symbole "avec les arguments" *> frExEnum
           ],
       FrPhSachantQue
         <$> (symbole "sachant que" *> nomVar)
         <*> (symbole "vaut" *> frExpr)
-        <*> (symbole "," *> frPhEnumeration),
+        <*> (symbole "," *> frPhEnum),
       FrPhSachantQueMaintenant
         <$> (symbole "sachant que," >> symbole "maintenant," *> nomVar)
         <*> (symbole "vaut" *> frExpr)
-        <*> (symbole "," *> frPhEnumeration),
+        <*> (symbole "," *> frPhEnum),
       FrPhSi
         <$> (symbole "si" *> frExpr <* symbole ",")
-        <*> frPhEnumeration
-        <*> ((symbole "." *> symbole "Sinon," *> frPhEnumeration) <|$> []),
+        <*> frPhEnum
+        <*> ((symbole "." *> symbole "Sinon," *> frPhEnum) <|$> []),
       FrPhTantQue
         <$> (symbole "tant que" *> frExpr <* symbole ",")
-        <*> frPhEnumeration,
+        <*> frPhEnum,
       FrPhPourChaqueCar
         <$> (symbole "pour chaque caractère" *> nomVar)
         <*> (symbole "dans" *> frExpr <* symbole ",")
-        <*> frPhEnumeration,
+        <*> frPhEnum,
       FrPhPourChaqueEl
         <$> (symbole "pour chaque élément" *> nomVar)
         <*> (symbole "dans" *> frExpr <* symbole ",")
-        <*> frPhEnumeration,
+        <*> frPhEnum,
       FrPhDefFonction
         <$> (symbole "début de la définition de la fonction nommée" *> nomVar)
         <*> ( choice
@@ -244,6 +244,24 @@ frPhrase =
     -- \*> optional (symbole "attention:" >> manyUntil (symbole "!") anyChar)
     *> frPhraseIncomplete
     <* symbole "."
+
+frMetaEnum = frEnumeration frMeta
+
+frMeta =
+  choice
+    [ FrMetaInclure
+        <$> ( symbole "inclure"
+                *> choice
+                  [ [] <$ symbole "tout le contenu",
+                    enumNomVar
+                  ]
+            )
+        <*> (symbole "du fichier" *> texte)
+    ]
+
+frMetas =
+  toFrPhrase (symbole "avant toutes choses," *> frMetaEnum)
+    <|$> []
 
 -------------------- Symboles --------------------
 

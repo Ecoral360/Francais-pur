@@ -5,8 +5,10 @@ import Control.Monad (join)
 import Data.Char (isDigit, isLetter, isSpace, isUpper, isUpperCase)
 import Data.Either (rights)
 import Data.Functor
-import Data.Map (Map, delete, empty, insert, lookup, member, notMember)
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.List (find)
+import qualified Data.List as List
+import Data.Map (Map, delete, empty, filterWithKey, insert, lookup, member, notMember)
+import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import FrancaisObj
 import FrancaisParse
 import GHC.Float
@@ -324,9 +326,29 @@ execPh env phrases =
 
 applyFrIO ios = foldr1 (>>) (reverse ios)
 
-runFr s = case exec empty s of
-  (Right _, io) -> applyFrIO io
-  (Left err, io) -> applyFrIO io >> print (frErrToString err)
+frEvalMeta :: [FrMeta] -> IO FrEnv
+frEvalMeta =
+  foldr
+    ( \meta env -> case meta of
+        FrMetaInclure [] fichier -> do
+          code <- readFile fichier
+          case exec empty code of
+            (Right env', io) ->
+              applyFrIO io >> (<>) env' <$> env
+        FrMetaInclure frVars fichier -> do
+          code <- readFile fichier
+          case exec empty code of
+            (Right env', io) ->
+              applyFrIO io >> (<>) (filterWithKey (\k _ -> isJust $ find (k ==) frVars) env') <$> env
+    )
+    $ pure empty
+
+runFr s = case runParser frMetas s 0 of
+  (Right (_, metas, rest)) -> do
+    env <- frEvalMeta metas
+    case exec env rest of
+      (Right _, io) -> applyFrIO io
+      (Left err, io) -> applyFrIO io >> print (frErrToString err)
 
 frToString :: FrObj -> String
 frToString FrNul = "nul"
