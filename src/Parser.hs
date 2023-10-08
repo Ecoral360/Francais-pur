@@ -60,6 +60,23 @@ token mkErr predicate = Parser $ \input offset -> case input of
     | predicate i -> Right (offset + 1, i, is)
     | otherwise -> Left [Error offset $ mkErr i]
 
+tokenMap :: (i -> ErrorType i) -> (i -> i) -> Parser i i
+tokenMap mkErr map = Parser $ \input offset -> case input of
+  [] -> Left [Error offset EndOfInput]
+  i : is -> let mapped = map i in Right (offset + 1, mapped, is)
+
+tokenPeek :: (i -> ErrorType i) -> (i -> Bool) -> Parser i i
+tokenPeek mkErr predicate = Parser $ \input offset -> case input of
+  [] -> Left [Error offset EndOfInput]
+  i : is
+    | predicate i -> Right (offset, i, input)
+    | otherwise -> Left [Error offset $ mkErr i]
+
+tokenMapPeek :: (i -> ErrorType i) -> (i -> i) -> Parser i i
+tokenMapPeek mkErr map = Parser $ \input offset -> case input of
+  [] -> Left [Error offset EndOfInput]
+  i : is -> let mapped = map i in Right (offset, mapped, mapped : is)
+
 parseError :: ErrorType i -> Parser i a
 parseError err = Parser $ \input offset -> Left [Error offset err]
 
@@ -70,6 +87,12 @@ eof = Parser $ \input offset -> case input of
 
 satisfy :: (i -> Bool) -> Parser i i
 satisfy = token Unexpected
+
+satisfyPeek :: (i -> Bool) -> Parser i i
+satisfyPeek = tokenPeek Unexpected
+
+mapCharPeek :: (i -> i) -> Parser i i
+mapCharPeek = tokenMapPeek Unexpected
 
 anyChar :: Parser i i
 anyChar = token Unexpected (const True)
@@ -99,6 +122,10 @@ between open close p = open *> p <* close
 
 collect :: [Parser i [a]] -> Parser i [a]
 collect = foldr (\x acc -> (<>) <$> x <*> acc) $ pure []
+
+manyN :: (Eq i) => Int -> Parser i a -> Parser i [a]
+manyN 0 _ = pure []
+manyN n p = (:) <$> p <*> manyN (n - 1) p
 
 manyUntil :: (Eq i) => Parser i a -> Parser i b -> Parser i [b]
 manyUntil stop repeated =

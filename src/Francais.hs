@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 module Francais where
 
 import Control.Applicative (Alternative (many, some, (<|>)), optional)
@@ -9,259 +7,10 @@ import Data.Either (rights)
 import Data.Functor
 import Data.Map (Map, empty, insert, lookup, member, notMember)
 import Data.Maybe (fromMaybe, mapMaybe)
+import FrancaisObj
+import FrancaisParse
 import GHC.Float
 import Parser
-
-espace = satisfy isSpace
-
-espaces = many espace
-
-lettre = satisfy isLetter
-
-chiffre = satisfy isDigit
-
-frChiffreSingulier =
-  choice
-    [ symZero,
-      symUn
-    ]
-
-frChiffrePluriel =
-  choice
-    [ symDeux,
-      symTrois,
-      symQuatre,
-      symCinq,
-      symSix,
-      symSept,
-      symHuit,
-      symNeuf,
-      symDix,
-      symOnze,
-      symDouze,
-      symTreize,
-      symQuatorze,
-      symQuinze,
-      symSeize,
-      (:) <$> chiffre <*> some chiffre
-    ]
-
-frChiffre = choice [frChiffreSingulier, frChiffrePluriel]
-
-entier =
-  collect
-    [ ("-" <$ symbole "moins") <|$> "",
-      frChiffre
-    ]
-
-decimal =
-  collect
-    [ ("-" <$ symbole "moins") <|$> "",
-      some chiffre,
-      "." <$ choice [string ",", symbole "virgule"],
-      some chiffre
-    ]
-
-texte =
-  between (string "« ") (string "»") $ many $ satisfy (/= '»')
-
-caractere =
-  choice
-    [ ' ' <$ symbole "espace",
-      '\n' <$ symbole "nouvelle ligne",
-      '\t' <$ symbole "tabulation",
-      between espaces espaces anyChar
-    ]
-
-nomVar =
-  (:)
-    <$> satisfy isUpperCase
-    <*> collect
-      [ many lettre,
-        many $ choice [lettre, chiffre]
-      ]
-
-enumNomVar =
-  collect
-    [ sepBy nomVar (symbole ","),
-      symbole "et" *> nomVar <&> (: [])
-    ]
-
-symbole s = espaces *> string s <* espaces
-
-data FrError
-  = FrErrVarInconnue FrVar
-  | FrErrBinOp String FrObj FrObj
-  | FrErrOp String FrObj
-  | FrErrIndex FrObj Int Int
-  | FrErrParse [Error Char]
-  | FrErrDecl FrVar String
-  | FrErrAppelFonction FrVar String
-  | --- Contrôle de flux
-    FrCtrlRetourner FrObj
-  | Empty -- Used in `Alternative` implementation of `empty`
-
-frErrToString :: FrError -> String
-frErrToString err = "Error"
-
-type FrVar = String
-
-data FrObj
-  = FrEntier Int
-  | FrDecimal Double
-  | FrTexte String
-  | FrCaractere Char
-  | FrTableau [FrObj]
-  | FrBool Bool
-  | FrIdent FrVar
-  | FrFonction {appelerFonc :: [FrObj] -> Either FrError (FrObj, IO ())}
-  | FrProcedure {appelerProc :: [FrObj] -> Either FrError (IO ())}
-  | FrIO FrObj (IO ())
-  | FrNul
-
-frObj =
-  choice
-    [ FrEntier . read <$> entier,
-      FrDecimal . read <$> decimal,
-      FrTexte <$> texte,
-      FrCaractere <$> (symbole "le caractère" *> caractere),
-      FrIdent <$> nomVar
-    ]
-
-data FrExpr
-  = FrExConst FrObj
-  | FrExTableau [FrExpr]
-  | FrExRien
-  | -- Opérations unaires
-    FrExMoinsUn FrExpr
-  | -- Opérations arithmétique
-    FrExPlus FrExpr FrExpr
-  | FrExMoins FrExpr FrExpr
-  | FrExFois FrExpr FrExpr
-  | FrExDiv FrExpr FrExpr
-  | FrExModulo FrExpr FrExpr
-  | -- Version variadique des opérations arithmétique
-    FrExSomme [FrExpr]
-  | FrExDiff [FrExpr]
-  | FrExProduit [FrExpr]
-  | FrExQuotient [FrExpr]
-  | FrExConcat [FrExpr]
-  | -- Opérations d'indexation
-    FrExIndex FrExpr FrExpr
-  | FrExPosition FrExpr FrExpr
-  | FrExCarIndex FrExpr FrExpr
-  | FrExCarPosition FrExpr FrExpr
-  | -- Appel de fonction
-    FrExAppelFonc FrExpr [FrExpr]
-
-frEnumeration =
-  collect
-    [ sepBy frExpr (symbole ","),
-      symbole "et" *> frExpr <&> (: [])
-    ]
-
-frExprUnaire =
-  choice
-    [ FrExTableau
-        <$> choice
-          [ [] <$ symbole "un tableau vide",
-            symbole "un tableau contenant seulement" *> frExpr <&> (: []),
-            symbole "un tableau contenant"
-              *> frEnumeration
-          ],
-      FrExConst <$> frObj,
-      FrExMoinsUn <$> (symbole "moins" *> frExprUnaire)
-    ]
-
-frExpr :: Parser Char FrExpr
-frExpr =
-  choice
-    [ between (char '"') (char '"') frExpr,
-      -- arithmétique
-      FrExPlus <$> frExprUnaire <*> (symbole "plus" *> frExpr),
-      FrExMoins <$> frExprUnaire <*> (symbole "moins" *> frExpr),
-      FrExFois <$> frExprUnaire <*> (symbole "fois" *> frExpr),
-      FrExDiv <$> frExprUnaire <*> (symbole "sur" *> frExpr),
-      FrExModulo <$> frExprUnaire <*> (symbole "modulo" *> frExpr),
-      -- arithmétique variadique
-      FrExSomme <$> (symbole "la somme de" *> frEnumeration),
-      FrExDiff <$> (symbole "la différence entre" *> frEnumeration),
-      FrExProduit <$> (symbole "le produit de" *> frEnumeration),
-      FrExQuotient <$> (symbole "le quotient de" *> frEnumeration),
-      FrExConcat <$> (symbole "la concaténation de" *> frEnumeration),
-      -- indexation
-      FrExIndex <$> (symbole "élément de" *> frExpr) <*> (symbole "à l'index" *> frExpr),
-      FrExPosition <$> (symbole "élément de" *> frExpr) <*> (symbole "à la position" *> frExpr),
-      FrExCarIndex <$> (symbole "caractère de" *> frExpr) <*> (symbole "à l'index" *> frExpr),
-      FrExCarPosition <$> (symbole "caractère de" *> frExpr) <*> (symbole "à la position" *> frExpr),
-      -- appel
-      FrExAppelFonc
-        <$> (symbole "l'appel à la fonction" *> frExpr)
-        <*> choice
-          [ (symbole "avec l'argument" *> frExpr) <&> (: []),
-            symbole "avec les arguments" *> frEnumeration
-          ],
-      -- autre
-      frExprUnaire
-    ]
-
-data FrPhrase
-  = FrPhImprimer FrExpr
-  | FrPhPosons FrVar FrExpr
-  | FrPhMaintenant FrVar FrExpr
-  | FrPhAppelerFonc FrExpr [FrExpr]
-  | FrPhAppelerProc FrExpr [FrExpr]
-  | FrPhDefFonction FrVar [FrVar] [FrPhrase]
-  | FrPhDefProcedure FrVar [FrVar] [FrPhrase]
-  | FrPhRetourner FrExpr
-
-frPhrase =
-  choice
-    [ FrPhImprimer <$> (symbole "Imprimer" *> frExpr),
-      FrPhPosons <$> (symbole "Posons que" *> nomVar) <*> (symbole "vaut" *> frExpr),
-      FrPhMaintenant <$> (symbole "Maintenant," *> nomVar) <*> (symbole "vaut" *> frExpr),
-      FrPhAppelerFonc
-        <$> (symbole "Appeler la fonction" *> frExpr)
-        <*> choice
-          [ (symbole "avec l'argument" *> frExpr) <&> (: []),
-            symbole "avec les arguments" *> frEnumeration
-          ],
-      FrPhAppelerProc
-        <$> (symbole "Appeler la procédure" *> frExpr)
-        <*> choice
-          [ (symbole "avec l'argument" *> frExpr) <&> (: []),
-            symbole "avec les arguments" *> frEnumeration
-          ],
-      FrPhDefFonction
-        <$> (symbole "Début de la définition de la fonction nommée" *> nomVar)
-        <*> choice
-          [ (symbole "acceptant le paramètre" *> nomVar) <&> (: []),
-            symbole "acceptant les paramètres" *> enumNomVar
-          ]
-        <* symbole "."
-        <*> manyUntil
-          (symbole "Fin de la définition de la fonction")
-          ( choice
-              [ FrPhRetourner <$> (symbole "Retourner" *> frExpr) <* symbole ".",
-                frPhrase
-              ]
-          ),
-      FrPhDefProcedure
-        <$> (symbole "Début de la définition de la procédure nommée" *> nomVar)
-        <*> choice
-          [ (symbole "acceptant le paramètre" *> nomVar) <&> (: []),
-            symbole "acceptant les paramètres" *> enumNomVar
-          ]
-        <* symbole "."
-        <*> manyUntil
-          (symbole "Fin de la définition de la procédure")
-          ( choice
-              [ FrPhRetourner <$> (FrExRien <$ symbole "Retourner") <* symbole ".",
-                frPhrase
-              ]
-          )
-    ]
-    <* symbole "."
 
 frBinOp :: String -> (Double -> Double -> Double) -> FrObj -> FrObj -> Either FrError FrObj
 frBinOp opName op (FrEntier g) (FrEntier d) = pure . FrEntier $ double2Int $ int2Double g `op` int2Double d
@@ -284,6 +33,21 @@ frDiv = frBinOpIO $ frBinOp "sur" (/)
 frConcat :: [FrObj] -> Either FrError FrObj
 frConcat objs = pure . FrTexte . foldr1 (++) $ map frToString objs
 
+frCompOpIO :: String -> (FrObj -> FrObj -> Bool) -> (FrObj, IO ()) -> (FrObj, IO ()) -> Either FrError (FrObj, IO ())
+frCompOpIO opNom compOp (g, io) (d, io') = Right (FrBool $ compOp g d, io >> io')
+
+frEq = frCompOpIO "vaut" (==)
+
+frNEq = frCompOpIO "ne vaut pas" (/=)
+
+frMoinsQue = frCompOpIO "vaut moins que" (<)
+
+frPlusQue = frCompOpIO "vaut plus que" (>)
+
+frMoinsEq = frCompOpIO "vaut moins ou autant que" (<=)
+
+frPlusEq = frCompOpIO "vaut plus ou autant que" (>=)
+
 ------ Eval d'expressions ------
 frEvalExpr :: FrEnv -> FrExpr -> Either FrError (FrObj, IO ())
 ----- Constantes -----
@@ -294,7 +58,7 @@ frEvalExpr env (FrExConst obj) = Right (obj, pure ())
 frEvalExpr env (FrExTableau tabEx) = do
   tabIO <- mapM (frEvalExpr env) tabEx
   let (tab, io) = unzip tabIO
-  Right (FrTableau tab, foldr1 (>>) io)
+  Right (FrTableau tab, applyFrIO io)
 
 ----- Arithmétique -----
 frEvalExpr env (FrExPlus exprG exprD) = do
@@ -317,11 +81,37 @@ frEvalExpr env (FrExDiv exprG exprD) = do
   d <- frEvalExpr env exprD
   frDiv g d
 
+----- Opération de comparaison -----
+frEvalExpr env (FrExEq exprG exprD) = do
+  g <- frEvalExpr env exprG
+  d <- frEvalExpr env exprD
+  frEq g d
+frEvalExpr env (FrExNEq exprG exprD) = do
+  g <- frEvalExpr env exprG
+  d <- frEvalExpr env exprD
+  frNEq g d
+frEvalExpr env (FrExPlusQue exprG exprD) = do
+  g <- frEvalExpr env exprG
+  d <- frEvalExpr env exprD
+  frPlusQue g d
+frEvalExpr env (FrExMoinsQue exprG exprD) = do
+  g <- frEvalExpr env exprG
+  d <- frEvalExpr env exprD
+  frMoinsQue g d
+frEvalExpr env (FrExPlusEq exprG exprD) = do
+  g <- frEvalExpr env exprG
+  d <- frEvalExpr env exprD
+  frPlusEq g d
+frEvalExpr env (FrExMoinsEq exprG exprD) = do
+  g <- frEvalExpr env exprG
+  d <- frEvalExpr env exprD
+  frMoinsEq g d
+
 ----- Arithmétique variadique -----
 frEvalExpr env (FrExConcat exprs) = do
   objsIO <- mapM (frEvalExpr env) exprs
   let (objs, io) = unzip objsIO
-  frConcat objs >>= \r -> Right (r, foldr1 (>>) io)
+  frConcat objs >>= \r -> Right (r, applyFrIO io)
 
 ----- Indexation de tableau -----
 frEvalExpr env (FrExIndex exprTab exprIdx) = do
@@ -387,7 +177,7 @@ frEvalExpr env (FrExAppelFonc foncExpr argsExpr) = do
   argsIO <- mapM (frEvalExpr env) argsExpr
   let (args, ios) = unzip argsIO
   case appelerFonc fonc args of
-    Right (obj, io') -> Right (obj, io >> foldr1 (>>) ios >> io')
+    Right (obj, io') -> Right (obj, io >> applyFrIO ios >> io')
     Left err -> Left err
 
 ------ Eval de phrase ------
@@ -395,6 +185,7 @@ frEval :: FrEnv -> FrPhrase -> Either FrError (FrEnv, IO ())
 frEval env (FrPhImprimer expr) = do
   (result, io) <- frEvalExpr env expr
   pure (env, io >> putStrLn (frToString result))
+
 ----- Déclarations -----
 frEval env (FrPhPosons var expr) = do
   (value, io) <- frEvalExpr env expr
@@ -405,6 +196,24 @@ frEval env (FrPhMaintenant var expr) = do
   (value, io) <- frEvalExpr env expr
   if member var env
     then pure (insert var value env, io)
+    else Left $ FrErrDecl var "La variable n'a pas été déclarée."
+frEval env (FrPhSachantQue var expr corps) = do
+  (value, io) <- frEvalExpr env expr
+  if notMember var env
+    then
+      let sachantEnv = insert var value env
+       in case execPh sachantEnv corps of
+            (Right _, io') -> pure (env, io >> applyFrIO io')
+            (Left err, _) -> Left err
+    else Left $ FrErrDecl var "La variable a déjà été déclarée."
+frEval env (FrPhSachantQueMaintenant var expr corps) = do
+  (value, io) <- frEvalExpr env expr
+  if member var env
+    then
+      let sachantEnv = insert var value env
+       in case execPh sachantEnv corps of
+            (Right _, io') -> pure (env, io >> applyFrIO io')
+            (Left err, _) -> Left err
     else Left $ FrErrDecl var "La variable n'a pas été déclarée."
 
 ----- Définition fonction -----
@@ -419,7 +228,7 @@ frEval env (FrPhDefFonction nom params corps)
     fonc = FrFonction $ \args ->
       let envFonc = foldr1 (<>) $ zipWith (\var val -> insert var val env) params args
        in case execPh envFonc corps of
-            (Left (FrCtrlRetourner obj), io) -> Right (obj, foldr1 (>>) io)
+            (Left (FrCtrlRetourner obj), io) -> Right (obj, applyFrIO io)
             (Right _, io) -> Left $ FrErrAppelFonction nom "Les fonctions doivent retourner une valeur."
             (Left err, io) -> Left err
 frEval env (FrPhDefProcedure nom params corps)
@@ -429,8 +238,8 @@ frEval env (FrPhDefProcedure nom params corps)
     fonc = FrProcedure $ \args ->
       let envFonc = foldr1 (<>) $ zipWith (\var val -> insert var val env) params args
        in case execPh envFonc corps of
-            (Right _, io) -> Right $ foldr1 (>>) io
-            (Left (FrCtrlRetourner _), io) -> Right $ foldr1 (>>) io
+            (Right _, io) -> Right $ applyFrIO io
+            (Left (FrCtrlRetourner _), io) -> Right $ applyFrIO io
             (Left err, io) -> Left err
 ----- Appel fonction -----
 frEval env (FrPhAppelerProc foncExpr argsExpr) = do
@@ -438,15 +247,31 @@ frEval env (FrPhAppelerProc foncExpr argsExpr) = do
   argsIO <- mapM (frEvalExpr env) argsExpr
   let (args, ios) = unzip argsIO
   case appelerProc fonc args of
-    Right io' -> Right (env, io >> foldr1 (>>) ios >> io')
+    Right io' -> Right (env, io >> applyFrIO ios >> io')
     Left err -> Left err
 frEval env (FrPhAppelerFonc foncExpr argsExpr) = do
   (fonc, io) <- frEvalExpr env foncExpr
   argsIO <- mapM (frEvalExpr env) argsExpr
   let (args, ios) = unzip argsIO
   case appelerFonc fonc args of
-    Right (obj, io') -> Right (env, io >> foldr1 (>>) ios >> io')
+    Right (obj, io') -> Right (env, io >> applyFrIO ios >> io')
     Left err -> Left err
+frEval env (FrPhSi condExpr corpsVrai corpsFaux) = do
+  (condObj, io) <- frEvalExpr env condExpr
+  case condObj of
+    (FrBool cond) ->
+      let corps = if cond then corpsVrai else corpsFaux
+       in case execPh env corps of
+            (Right nouvelEnv, ios) -> Right (nouvelEnv, io >> applyFrIO ios)
+            (Left err, io) -> Left err
+frEval env boucle@(FrPhTantQue condExpr corps) = do
+  (condObj, io) <- frEvalExpr env condExpr
+  case condObj of
+    (FrBool True) ->
+      case execPh env $ corps ++ [boucle] of
+        (Right nouvelEnv, ios) -> Right (nouvelEnv, io >> applyFrIO ios)
+        (Left err, io) -> Left err
+    (FrBool False) -> Right (env, io)
 
 parse s = runParser frExpr s 0
 
@@ -461,9 +286,9 @@ eval env s =
 
 exec :: FrEnv -> String -> (Either FrError FrEnv, [IO ()])
 exec env s =
-  case runParser (many frPhrase) s 0 of
+  case runParser (many frPhrase <* eof) s 0 of
     (Right (_, phrases, _)) -> execPh env phrases
-    (Left err) -> (Right env, [print err])
+    (Left err) -> (Left $ FrErrParse err, [print err])
 
 execPh :: FrEnv -> [FrPhrase] -> (Either FrError FrEnv, [IO ()])
 execPh env phrases =
@@ -479,12 +304,17 @@ execPh env phrases =
     (Right env, [pure ()])
     (reverse phrases)
 
+applyFrIO ios = foldr1 (>>) (reverse ios)
+
 runFr s = case exec empty s of
-  (Right _, io) -> foldr1 (>>) (reverse io)
-  (Left err, io) -> print $ frErrToString err
+  (Right _, io) -> applyFrIO io
+  (Left err, io) -> applyFrIO io >> print (frErrToString err)
 
 frToString :: FrObj -> String
 frToString FrNul = "nul"
+frToString (FrBool v)
+  | v = "Vrai"
+  | otherwise = "Faux"
 frToString (FrTexte s) = s
 frToString (FrEntier i) =
   ( if i < 0 && i > -16
@@ -517,39 +347,4 @@ frToString (FrTableau x) = "un tableau contenant " ++ tableauToString x
   where
     tableauToString [x, x'] = frToString x ++ " et " ++ frToString x'
     tableauToString (x : xs) = frToString x ++ ", " ++ tableauToString xs
-
--------------------- Symboles --------------------
-
-symZero = "0" <$ symbole "zéro"
-
-symUn = "1" <$ symbole "un"
-
-symDeux = "2" <$ symbole "deux"
-
-symTrois = "3" <$ symbole "trois"
-
-symQuatre = "4" <$ symbole "quatre"
-
-symCinq = "5" <$ symbole "cinq"
-
-symSix = "6" <$ symbole "six"
-
-symSept = "7" <$ symbole "sept"
-
-symHuit = "8" <$ symbole "huit"
-
-symNeuf = "9" <$ symbole "neuf"
-
-symDix = "10" <$ symbole "dix"
-
-symOnze = "11" <$ symbole "onze"
-
-symDouze = "12" <$ symbole "douze"
-
-symTreize = "13" <$ symbole "treize"
-
-symQuatorze = "14" <$ symbole "quatorze"
-
-symQuinze = "15" <$ symbole "quinze"
-
-symSeize = "16" <$ symbole "seize"
+frToString (FrFonction _) = "Fonction"

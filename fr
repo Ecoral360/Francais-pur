@@ -1,12 +1,20 @@
 #!/bin/sh
 
+ACTION="$1"
+shift
+CODE="$(sed -z 's/\n/ /g' "$1" | sed -r 's/"/\\"/g')"
 
-case "$1" in
+case "$ACTION" in
 "rouler")
-    shift
 	{
 		echo "import Francais"
-		printf "runFr \"%s\"" "$(sed -z 's/\n//g' "$1")"
+		printf 'runFr "%s"' "$CODE"
+	} | cabal repl -v0
+	;;
+"asa")
+	{
+		echo "import Francais"
+		printf 'runFr "%s"' "$CODE"
 	} | cabal repl -v0
 	;;
 esac
