@@ -306,9 +306,9 @@ eval env s =
 
 exec :: FrEnv -> String -> (Either FrError FrEnv, [IO ()])
 exec env s =
-  case runParser (many frPhrase <* eof) s 0 of
+  case runParser (manyUntil eof frPhrase) s 0 of
     (Right (_, phrases, _)) -> execPh env phrases
-    (Left err) -> (Left $ FrErrParse err, [print err])
+    (Left err) -> (Left $ FrErrParse err, [print $ last err])
 
 execPh :: FrEnv -> [FrPhrase] -> (Either FrError FrEnv, [IO ()])
 execPh env phrases =

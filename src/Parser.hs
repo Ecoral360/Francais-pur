@@ -9,7 +9,7 @@ data ErrorType i
   | Unexpected i -- We didn't expect to find this element
   | Expected i i -- We expected to find this element
   | ExpectedEndOfFile i
-  | NoChoiceMatched
+  | NoChoiceMatched String
   | CustomError String -- Extra errors the user may want to create
   | Empty -- Used in `Alternative` implementation of `empty`
   deriving (Eq, Show)
@@ -106,7 +106,7 @@ string :: (Eq i) => [i] -> Parser i [i]
 string = traverse char
 
 choice :: (Eq i) => [Parser i a] -> Parser i a
-choice = foldr (<|>) $ parseError NoChoiceMatched
+choice = foldr (<|>) $ parseError (NoChoiceMatched "")
 
 --
 -- many, many1 :: (Eq i) => Parser i a -> Parser i [a]

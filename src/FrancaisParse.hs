@@ -101,8 +101,15 @@ frEnumeration p =
     [ sepBy p (symbole ","),
       symbole "et" *> p <&> (: [])
     ]
+    <|> (p <&> (: []))
 
-frExEnum = frEnumeration frExpr
+frEnumeration1 p =
+  collect
+    [ sepBy p (symbole ","),
+      symbole "et" *> p <&> (: [])
+    ]
+
+frExEnum = frEnumeration1 frExpr
 
 frPhEnum = frEnumeration frPhraseIncomplete
 
@@ -167,6 +174,7 @@ frExpr =
       -- autre
       frExprUnaire
     ]
+    <|> parseError (NoChoiceMatched "Expression")
 
 frPhraseIncomplete =
   choice
@@ -234,6 +242,7 @@ frPhraseIncomplete =
           frPhrase,
       FrPhRetourner <$> ((symbole "retourner" *> frExpr) <|> (FrExRien <$ symbole "retourner"))
     ]
+    <|> parseError (NoChoiceMatched "Phrase")
 
 toFrPhrase phraseIncomplete = espaces *> satisfyPeek isUpperCase >> mapCharPeek toLower >> phraseIncomplete <* symbole "."
 
