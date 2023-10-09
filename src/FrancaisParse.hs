@@ -84,9 +84,6 @@ enumNomVar = frEnumeration nomVar
 
 symbole s = espaces *> string s <* espaces
 
-frErrToString :: FrError -> String
-frErrToString err = "Error"
-
 frObj =
   choice
     [ FrEntier . read <$> entier,
@@ -111,7 +108,10 @@ frEnumeration1 p =
 
 frExEnum = frEnumeration1 frExpr
 
-frPhEnum = frEnumeration frPhraseIncomplete
+frPhEnum =
+  (<|>)
+    (symbole ":" *> frEnumeration1 frPhraseIncomplete)
+    $ (symbole "," *> frPhraseIncomplete) <&> (: [])
 
 frMetaEnumeration =
   collect
@@ -122,7 +122,8 @@ frMetaEnumeration =
 
 frExprUnaire =
   choice
-    [ FrExTableau
+    [ between (char '"') (char '"') frExpr,
+      FrExTableau
         <$> choice
           [ [] <$ symbole "un tableau vide",
             symbole "un tableau contenant seulement" *> frExpr <&> (: []),
@@ -136,8 +137,7 @@ frExprUnaire =
 frExpr :: Parser Char FrExpr
 frExpr =
   choice
-    [ between (char '"') (char '"') frExpr,
-      frExprUnaire >>= \gauche ->
+    [ frExprUnaire >>= \gauche ->
         choice
           [ -- arithmétique
             FrExPlus gauche <$> (symbole "plus" *> frExpr),
@@ -145,6 +145,7 @@ frExpr =
             FrExFois gauche <$> (symbole "fois" *> frExpr),
             FrExDiv gauche <$> (symbole "sur" *> frExpr),
             FrExModulo gauche <$> (symbole "modulo" *> frExpr),
+            FrExExposant gauche <$> (symbole "exposant" *> frExpr),
             -- comparaison
             FrExEq gauche <$> (symbole "vaut" *> frExpr),
             FrExNEq gauche <$> (symbole "ne vaut pas" *> frExpr),
@@ -161,16 +162,32 @@ frExpr =
       FrExConcat <$> (symbole "la concaténation de" *> frExEnum),
       -- indexation
       FrExIndex <$> (symbole "élément de" *> frExpr) <*> (symbole "à l'index" *> frExpr),
-      FrExPosition <$> (symbole "élément de" *> frExpr) <*> (symbole "à la position" *> frExpr),
+      FrExIndex
+        <$> (symbole "élément de" *> frExpr)
+        <*> (FrExPlus (FrExConst (FrEntier (-1))) <$> (symbole "à la position" *> frExpr)),
       FrExCarIndex <$> (symbole "caractère de" *> frExpr) <*> (symbole "à l'index" *> frExpr),
-      FrExCarPosition <$> (symbole "caractère de" *> frExpr) <*> (symbole "à la position" *> frExpr),
+      FrExCarIndex
+        <$> (symbole "caractère de" *> frExpr)
+        <*> (FrExPlus (FrExConst (FrEntier (-1))) <$> (symbole "à la position" *> frExpr)),
+      -- FrExCarPosition <$> (symbole "caractère de" *> frExpr) <*> (symbole "à la position" *> frExpr),
       -- appel
       FrExAppelFonc
-        <$> (symbole "l'appel à la fonction" *> frExpr)
+        <$> (symbole "le résultat de l'appel à la fonction" *> frExpr)
         <*> choice
           [ (symbole "avec l'argument" *> frExpr) <&> (: []),
             symbole "avec les arguments" *> frExEnum
           ],
+      FrExDefFonction
+        <$> ( symbole "une fonction"
+                *> ( choice
+                       [ [] <$ symbole "n'acceptant aucun paramètre",
+                         (symbole "acceptant le paramètre" *> nomVar) <&> (: []),
+                         symbole "acceptant les paramètres" *> enumNomVar
+                       ]
+                       <* symbole "."
+                   )
+            )
+        <*> (symbole "Lorsqu'appelée" *> frPhEnum),
       -- autre
       frExprUnaire
     ]
@@ -180,42 +197,53 @@ frPhraseIncomplete =
   choice
     [ FrPhImprimer <$> (symbole "imprimer" *> frExpr),
       FrPhPosons <$> (symbole "posons que" *> nomVar) <*> (symbole "vaut" *> frExpr),
-      FrPhMaintenant <$> (symbole "maintenant," *> nomVar) <*> (symbole "vaut" *> frExpr),
+      FrPhMaintenant <$> (symbole "maintenant," *> frExpr) <*> (symbole "vaut" *> frExpr),
       FrPhAppelerFonc
         <$> (symbole "appeler la fonction" *> frExpr)
         <*> choice
-          [ (symbole "avec l'argument" *> frExpr) <&> (: []),
+          [ [] <$ symbole "sans argument",
+            (symbole "avec l'argument" *> frExpr) <&> (: []),
             symbole "avec les arguments" *> frExEnum
           ],
       FrPhAppelerProc
         <$> (symbole "appeler la procédure" *> frExpr)
         <*> choice
-          [ (symbole "avec l'argument" *> frExpr) <&> (: []),
+          [ [] <$ symbole "sans argument",
+            (symbole "avec l'argument" *> frExpr) <&> (: []),
             symbole "avec les arguments" *> frExEnum
           ],
       FrPhSachantQue
         <$> (symbole "sachant que" *> nomVar)
         <*> (symbole "vaut" *> frExpr)
-        <*> (symbole "," *> frPhEnum),
+        <*> frPhEnum,
       FrPhSachantQueMaintenant
         <$> (symbole "sachant que," >> symbole "maintenant," *> nomVar)
         <*> (symbole "vaut" *> frExpr)
-        <*> (symbole "," *> frPhEnum),
+        <*> frPhEnum,
       FrPhSi
-        <$> (symbole "si" *> frExpr <* symbole ",")
+        <$> (symbole "si" *> frExpr)
         <*> frPhEnum
-        <*> ((symbole "." *> symbole "Sinon," *> frPhEnum) <|$> []),
+        <*> ((symbole "." *> symbole "Sinon" *> frPhEnum) <|$> []),
       FrPhTantQue
-        <$> (symbole "tant que" *> frExpr <* symbole ",")
+        <$> (symbole "tant que" *> frExpr)
         <*> frPhEnum,
       FrPhPourChaqueCar
         <$> (symbole "pour chaque caractère" *> nomVar)
-        <*> (symbole "dans" *> frExpr <* symbole ",")
+        <*> (symbole "dans" *> frExpr)
         <*> frPhEnum,
       FrPhPourChaqueEl
         <$> (symbole "pour chaque élément" *> nomVar)
-        <*> (symbole "dans" *> frExpr <* symbole ",")
+        <*> (symbole "dans" *> frExpr)
         <*> frPhEnum,
+      FrPhAjouter
+        <$> (symbole "ajouter" *> frExpr)
+        <*> choice
+          [ FrDebut <$ symbole "au début",
+            FrFin <$ symbole "à la fin",
+            FrIdx <$> (symbole "à l'index" *> frExpr),
+            FrIdx . FrExPlus (FrExConst (FrEntier (-1))) <$> (symbole "à la position" *> frExpr)
+          ]
+        <*> (symbole "de" *> nomVar),
       FrPhDefFonction
         <$> (symbole "début de la définition de la fonction nommée" *> nomVar)
         <*> ( choice
@@ -242,7 +270,6 @@ frPhraseIncomplete =
           frPhrase,
       FrPhRetourner <$> ((symbole "retourner" *> frExpr) <|> (FrExRien <$ symbole "retourner"))
     ]
-    <|> parseError (NoChoiceMatched "Phrase")
 
 toFrPhrase phraseIncomplete = espaces *> satisfyPeek isUpperCase >> mapCharPeek toLower >> phraseIncomplete <* symbole "."
 

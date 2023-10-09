@@ -30,7 +30,11 @@ frMoins = frBinOpIO $ frBinOp "moins" (-)
 
 frFois = frBinOpIO $ frBinOp "fois" (*)
 
-frDiv = frBinOpIO $ frBinOp "sur" (/)
+frDiv = frBinOpIO $ frBinOp "div" (/)
+
+frExposant = frBinOpIO $ frBinOp "exposant" (**)
+
+frMod (FrEntier g, io) (FrEntier d, io') = Right (FrEntier $ g `mod` d, io >> io')
 
 frConcat :: [FrObj] -> Either FrError FrObj
 frConcat objs = pure . FrTexte . foldr1 (++) $ map frToString objs
@@ -49,6 +53,40 @@ frPlusQue = frCompOpIO "vaut plus que" (>)
 frMoinsEq = frCompOpIO "vaut moins ou autant que" (<=)
 
 frPlusEq = frCompOpIO "vaut plus ou autant que" (>=)
+
+frGetCar :: FrEnv -> FrExpr -> FrExpr -> Either FrError (String, Int, IO ())
+frGetCar env txtExpr idxExpr = do
+  (texte, io) <- frEvalExpr env txtExpr
+  texte <- case texte of
+    (FrTexte texte) -> pure texte
+    other -> Left $ FrErrOp "index" other
+  (idx, io') <- frEvalExpr env idxExpr
+  idx <-
+    case idx of
+      (FrEntier idx) -> pure idx
+      other -> Left $ FrErrBinOp "index" (FrTexte texte) other
+  pure (texte, idx, io >> io')
+
+frGetEl :: FrEnv -> FrExpr -> FrExpr -> Either FrError ([FrObj], Int, IO ())
+frGetEl env tabExpr idxExpr = do
+  (tab, io) <- frEvalExpr env tabExpr
+  tab <- case tab of
+    (FrTableau tab) -> pure tab
+    other -> Left $ FrErrOp "index" other
+  (idx, io') <- frEvalExpr env idxExpr
+  idx <-
+    case idx of
+      (FrEntier idx) -> pure idx
+      other -> Left $ FrErrBinOp "index" (FrTableau tab) other
+  pure (tab, idx, io >> io')
+
+frAjouter :: FrPositon -> FrEnv -> [a] -> a -> Either FrError ([a], IO ())
+frAjouter FrDebut _ els el = pure (el : els, pure ())
+frAjouter FrFin _ els el = pure (els ++ [el], pure ())
+frAjouter (FrIdx idxExpr) env els el = do
+  (idxObj, io) <- frEvalExpr env idxExpr
+  let (FrEntier idx) = idxObj
+  pure (take idx els ++ el : drop idx els, io)
 
 ------ Eval d'expressions ------
 frEvalExpr :: FrEnv -> FrExpr -> Either FrError (FrObj, IO ())
@@ -82,6 +120,14 @@ frEvalExpr env (FrExDiv exprG exprD) = do
   g <- frEvalExpr env exprG
   d <- frEvalExpr env exprD
   frDiv g d
+frEvalExpr env (FrExExposant exprG exprD) = do
+  g <- frEvalExpr env exprG
+  d <- frEvalExpr env exprD
+  frExposant g d
+frEvalExpr env (FrExModulo exprG exprD) = do
+  g <- frEvalExpr env exprG
+  d <- frEvalExpr env exprD
+  frMod g d
 
 ----- Opération de comparaison -----
 frEvalExpr env (FrExEq exprG exprD) = do
@@ -117,63 +163,47 @@ frEvalExpr env (FrExConcat exprs) = do
 
 ----- Indexation de tableau -----
 frEvalExpr env (FrExIndex exprTab exprIdx) = do
-  (tab, io) <- frEvalExpr env exprTab
-  tab <- case tab of
-    (FrTableau tab) -> pure tab
-    other -> Left $ FrErrOp "index" other
-  (idx, io') <- frEvalExpr env exprTab
-  idx <-
-    case idx of
-      (FrEntier idx) -> pure idx
-      other -> Left $ FrErrBinOp "index" (FrTableau tab) other
+  (tab, idx, io) <- frGetEl env exprTab exprIdx
   let maxIdx = length tab
    in if idx >= maxIdx
         then Left $ FrErrIndex (FrTableau tab) idx (maxIdx - 1)
-        else Right (tab !! idx, io >> io')
-frEvalExpr env (FrExPosition exprTab exprIdx) = do
-  (tab, io) <- frEvalExpr env exprTab
-  tab <- case tab of
-    (FrTableau tab) -> pure tab
-    other -> Left $ FrErrOp "position" other
-  (idx, io') <- frEvalExpr env exprTab
-  idx <-
-    case idx of
-      (FrEntier idx) -> pure idx
-      other -> Left $ FrErrBinOp "position" (FrTableau tab) other
-  let maxIdx = length tab
-   in if idx > maxIdx
-        then Left $ FrErrIndex (FrTableau tab) idx maxIdx
-        else Right (tab !! (idx - 1), io >> io')
+        else Right (tab !! idx, io)
+-- frEvalExpr env (FrExPosition exprTab exprIdx) = do
+--   (tab, io) <- frEvalExpr env exprTab
+--   tab <- case tab of
+--     (FrTableau tab) -> pure tab
+--     other -> Left $ FrErrOp "position" other
+--   (idx, io') <- frEvalExpr env exprTab
+--   idx <-
+--     case idx of
+--       (FrEntier idx) -> pure idx
+--       other -> Left $ FrErrBinOp "position" (FrTableau tab) other
+--   let maxIdx = length tab
+--    in if idx > maxIdx
+--         then Left $ FrErrIndex (FrTableau tab) idx maxIdx
+--         else Right (tab !! (idx - 1), io >> io')
 
 ----- Indexation de texte -----
 frEvalExpr env (FrExCarIndex exprTxt exprIdx) = do
-  (txt, io) <- frEvalExpr env exprTxt
-  txt <- case txt of
-    (FrTexte tab) -> pure tab
-    other -> Left $ FrErrOp "index" other
-  (idx, io') <- frEvalExpr env exprIdx
-  idx <-
-    case idx of
-      (FrEntier idx) -> pure idx
-      other -> Left $ FrErrBinOp "index" (FrTexte txt) other
-  let maxIdx = length txt
+  (texte, idx, io) <- frGetCar env exprTxt exprIdx
+  let maxIdx = length texte
    in if idx >= maxIdx
-        then Left $ FrErrIndex (FrTexte txt) idx (maxIdx - 1)
-        else Right (FrCaractere $ txt !! idx, io >> io')
-frEvalExpr env (FrExCarPosition exprTxt exprIdx) = do
-  (txt, io) <- frEvalExpr env exprTxt
-  txt <- case txt of
-    (FrTexte tab) -> pure tab
-    other -> Left $ FrErrOp "position" other
-  (idx, io') <- frEvalExpr env exprIdx
-  idx <-
-    case idx of
-      (FrEntier idx) -> pure idx
-      other -> Left $ FrErrBinOp "position" (FrTexte txt) other
-  let maxIdx = length txt
-   in if idx > maxIdx
-        then Left $ FrErrIndex (FrTexte txt) idx maxIdx
-        else Right (FrCaractere $ txt !! (idx - 1), io >> io')
+        then Left $ FrErrIndex (FrTexte texte) idx (maxIdx - 1)
+        else Right (FrCaractere $ texte !! idx, io)
+-- frEvalExpr env (FrExCarPosition exprTxt exprIdx) = do
+--   (txt, io) <- frEvalExpr env exprTxt
+--   txt <- case txt of
+--     (FrTexte tab) -> pure tab
+--     other -> Left $ FrErrOp "position" other
+--   (idx, io') <- frEvalExpr env exprIdx
+--   idx <-
+--     case idx of
+--       (FrEntier idx) -> pure idx
+--       other -> Left $ FrErrBinOp "position" (FrTexte txt) other
+--   let maxIdx = length txt
+--    in if idx > maxIdx
+--         then Left $ FrErrIndex (FrTexte txt) idx maxIdx
+--         else Right (FrCaractere $ txt !! (idx - 1), io >> io')
 frEvalExpr env (FrExAppelFonc foncExpr argsExpr) = do
   (fonc, io) <- frEvalExpr env foncExpr
   argsIO <- mapM (frEvalExpr env) argsExpr
@@ -181,24 +211,55 @@ frEvalExpr env (FrExAppelFonc foncExpr argsExpr) = do
   case appelerFonc fonc args of
     Right (obj, io') -> Right (obj, io >> applyFrIO ios >> io')
     Left err -> Left err
+frEvalExpr env (FrExDefFonction params corps) =
+  pure
+    ( FrFonction $ \args ->
+        let envFonc = foldr1 (<>) $ zipWith (\var val -> insert var val env) params args
+         in case execPh envFonc corps of
+              (Left (FrCtrlRetourner obj), io) -> Right (obj, applyFrIO io)
+              (Right _, io) -> Left $ FrErrAppelFonction "anonyme" "Les fonctions doivent retourner une valeur."
+              (Left err, io) -> Left err,
+      pure ()
+    )
 
 ------ Eval de phrase ------
 frEval :: FrEnv -> FrPhrase -> Either FrError (FrEnv, IO ())
 frEval env (FrPhImprimer expr) = do
   (result, io) <- frEvalExpr env expr
   pure (env, io >> putStrLn (frToString result))
-
+frEval env (FrPhAjouter valueExpr position var) = do
+  (value, io) <- frEvalExpr env valueExpr
+  (contenant, io') <- frEvalExpr env (FrExConst (FrIdent var))
+  case contenant of
+    (FrTableau tab) -> do
+      (nouveauTab, io'') <- frAjouter position env tab value
+      pure (insert var (FrTableau nouveauTab) env, io >> io' >> io'')
+    (FrTexte texte) -> do
+      let (FrCaractere c) = value
+      (nouveauTexte, io'') <- frAjouter position env texte c
+      pure (insert var (FrTexte nouveauTexte) env, io >> io' >> io'')
 ----- Déclarations -----
 frEval env (FrPhPosons var expr) = do
   (value, io) <- frEvalExpr env expr
   if notMember var env
     then pure (insert var value env, io)
     else Left $ FrErrDecl var "La variable a déjà été déclarée."
-frEval env (FrPhMaintenant var expr) = do
+frEval env (FrPhMaintenant varExpr expr) = do
   (value, io) <- frEvalExpr env expr
-  if member var env
-    then pure (insert var value env, io)
-    else Left $ FrErrDecl var "La variable n'a pas été déclarée."
+  case varExpr of
+    (FrExConst (FrIdent var)) ->
+      if member var env
+        then pure (insert var value env, io)
+        else Left $ FrErrDecl var "La variable n'a pas été déclarée."
+    (FrExIndex varExpr'@(FrExConst (FrIdent var)) idxExpr) -> do
+      (tab, idx, io') <- frGetEl env varExpr idxExpr
+      let nouveauTab = FrTableau $ take idx tab ++ value : drop (idx + 1) tab
+      pure (insert var nouveauTab env, io' >> io)
+    (FrExCarIndex varExpr'@(FrExConst (FrIdent var)) idxExpr) -> do
+      let (FrCaractere c) = value
+      (texte, idx, io') <- frGetCar env varExpr idxExpr
+      let nouveauTexte = FrTexte $ take idx texte ++ c : drop (idx + 1) texte
+      pure (insert var nouveauTexte env, io' >> io)
 frEval env (FrPhSachantQue var expr corps) = do
   (value, io) <- frEvalExpr env expr
   if notMember var env
@@ -293,63 +354,6 @@ frEval env (FrPhPourChaqueEl var expr corps) = do
             (Left err, io) -> Left err
     (FrTableau []) -> Right (delete var env, io)
 
-parse s = runParser frExpr s 0
-
-type FrEnv = Map FrVar FrObj
-
-eval env s =
-  case runParser frExpr s 0 of
-    (Right (_, expr, _)) -> do
-      (result, io) <- frEvalExpr env expr
-      pure $ frToString result
-    (Left err) -> Left $ FrErrParse err
-
-exec :: FrEnv -> String -> (Either FrError FrEnv, [IO ()])
-exec env s =
-  case runParser (manyUntil eof frPhrase) s 0 of
-    (Right (_, phrases, _)) -> execPh env phrases
-    (Left err) -> (Left $ FrErrParse err, [print $ last err])
-
-execPh :: FrEnv -> [FrPhrase] -> (Either FrError FrEnv, [IO ()])
-execPh env phrases =
-  foldr
-    ( \phrase ctx ->
-        case ctx of
-          (Right env, io) ->
-            case frEval env phrase of
-              Right (env', io') -> (Right env', io' : io)
-              Left err -> (Left err, io)
-          (Left err, io) -> (Left err, io)
-    )
-    (Right env, [pure ()])
-    (reverse phrases)
-
-applyFrIO ios = foldr1 (>>) (reverse ios)
-
-frEvalMeta :: [FrMeta] -> IO FrEnv
-frEvalMeta =
-  foldr
-    ( \meta env -> case meta of
-        FrMetaInclure [] fichier -> do
-          code <- readFile fichier
-          case exec empty code of
-            (Right env', io) ->
-              applyFrIO io >> (<>) env' <$> env
-        FrMetaInclure frVars fichier -> do
-          code <- readFile fichier
-          case exec empty code of
-            (Right env', io) ->
-              applyFrIO io >> (<>) (filterWithKey (\k _ -> isJust $ find (k ==) frVars) env') <$> env
-    )
-    $ pure empty
-
-runFr s = case runParser frMetas s 0 of
-  (Right (_, metas, rest)) -> do
-    env <- frEvalMeta metas
-    case exec env rest of
-      (Right _, io) -> applyFrIO io
-      (Left err, io) -> applyFrIO io >> print (frErrToString err)
-
 frToString :: FrObj -> String
 frToString FrNul = "nul"
 frToString (FrBool v)
@@ -358,7 +362,7 @@ frToString (FrBool v)
 frToString (FrTexte s) = s
 frToString (FrCaractere c) = "le caractère " ++ [c]
 frToString (FrEntier i) =
-  ( if i < 0 && i > -16
+  ( if i < 0 && i > -17
       then "moins "
       else ""
   )
@@ -389,3 +393,72 @@ frToString (FrTableau x) = "un tableau contenant " ++ tableauToString x
     tableauToString [x, x'] = frToString x ++ " et " ++ frToString x'
     tableauToString (x : xs) = frToString x ++ ", " ++ tableauToString xs
 frToString (FrFonction _) = "Fonction"
+
+frErrToString :: FrError -> String
+frErrToString (FrErrParse err) = show err
+frErrToString (FrErrDecl var raison) = var ++ " " ++ raison
+frErrToString (FrErrAppelFonction nomFonc raison) = show nomFonc ++ " " ++ raison
+frErrToString (FrErrBinOp op gauche droite) =
+  op
+    ++ " "
+    ++ frToString gauche
+    ++ frToString droite
+frErrToString (FrErrOp op obj) = op ++ " " ++ frToString obj
+frErrToString (FrErrVarInconnue var) = var ++ " n'existe pas"
+frErrToString err = "Error"
+
+type FrEnv = Map FrVar FrObj
+
+eval env s =
+  case runParser frExpr s 0 of
+    (Right (_, expr, _)) -> do
+      (result, io) <- frEvalExpr env expr
+      pure $ frToString result
+    (Left err) -> Left $ FrErrParse err
+
+exec :: FrEnv -> String -> (Either FrError FrEnv, [IO ()])
+exec env s =
+  case runParser (many frPhrase <* eof) s 0 of
+    (Right (_, phrases, _)) -> execPh env phrases
+    (Left err) -> (Left $ FrErrParse err, [print $ last err])
+
+execPh :: FrEnv -> [FrPhrase] -> (Either FrError FrEnv, [IO ()])
+execPh env phrases =
+  foldr
+    ( \phrase ctx ->
+        case ctx of
+          (Right env, io) ->
+            case frEval env phrase of
+              Right (env', io') -> (Right env', io' : io)
+              Left err -> (Left err, io)
+          (Left err, io) -> (Left err, io)
+    )
+    (Right env, [pure ()])
+    (reverse phrases)
+
+applyFrIO [] = pure ()
+applyFrIO ios = foldr1 (>>) (reverse ios)
+
+frEvalMeta :: [FrMeta] -> IO FrEnv
+frEvalMeta =
+  foldr
+    ( \meta env -> case meta of
+        FrMetaInclure [] fichier -> do
+          code <- readFile fichier
+          case exec empty code of
+            (Right env', io) ->
+              applyFrIO io >> (<>) env' <$> env
+        FrMetaInclure frVars fichier -> do
+          code <- readFile fichier
+          case exec empty code of
+            (Right env', io) ->
+              applyFrIO io >> (<>) (filterWithKey (\k _ -> isJust $ find (k ==) frVars) env') <$> env
+    )
+    $ pure empty
+
+runFr s = case runParser frMetas s 0 of
+  (Right (_, metas, rest)) -> do
+    env <- frEvalMeta metas
+    case exec env rest of
+      (Right _, io) -> applyFrIO io
+      (Left err, io) -> applyFrIO io >> print (frErrToString err)

@@ -67,6 +67,7 @@ data FrExpr
   | FrExMoins FrExpr FrExpr
   | FrExFois FrExpr FrExpr
   | FrExDiv FrExpr FrExpr
+  | FrExExposant FrExpr FrExpr
   | FrExModulo FrExpr FrExpr
   | -- Opérations de comparaison
     FrExEq FrExpr FrExpr
@@ -83,16 +84,19 @@ data FrExpr
   | FrExConcat [FrExpr]
   | -- Opérations d'indexation
     FrExIndex FrExpr FrExpr
-  | FrExPosition FrExpr FrExpr
   | FrExCarIndex FrExpr FrExpr
-  | FrExCarPosition FrExpr FrExpr
+  | -- def fonctions
+    FrExDefFonction [FrVar] [FrPhrase]
+  | FrExDefProcedure [FrVar] [FrPhrase]
   | -- Appel de fonction
     FrExAppelFonc FrExpr [FrExpr]
+
+data FrPositon = FrDebut | FrFin | FrIdx FrExpr
 
 data FrPhrase
   = FrPhImprimer FrExpr
   | FrPhPosons FrVar FrExpr
-  | FrPhMaintenant FrVar FrExpr
+  | FrPhMaintenant FrExpr FrExpr
   | FrPhAppelerFonc FrExpr [FrExpr]
   | FrPhAppelerProc FrExpr [FrExpr]
   | FrPhDefFonction FrVar [FrVar] [FrPhrase]
@@ -104,6 +108,7 @@ data FrPhrase
   | FrPhTantQue FrExpr [FrPhrase]
   | FrPhPourChaqueCar FrVar FrExpr [FrPhrase]
   | FrPhPourChaqueEl FrVar FrExpr [FrPhrase]
+  | FrPhAjouter FrExpr FrPositon FrVar
 
 data FrMeta
   = FrMetaInclure [FrVar] String
