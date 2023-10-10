@@ -22,7 +22,11 @@ data FrError
   | --- Contrôle de flux
     FrCtrlRetourner FrObj
 
+type FrEnv = Map FrVar FrObj
+
 type FrVar = String
+
+type FrOp = String
 
 data FrObj
   = FrEntier Int
@@ -34,6 +38,7 @@ data FrObj
   | FrIdent FrVar
   | FrFonction {appelerFonc :: [FrObj] -> Either FrError (FrObj, IO ())}
   | FrProcedure {appelerProc :: [FrObj] -> Either FrError (IO ())}
+  | FrOperationInfixe {appelerOpInfixe :: FrObj -> FrObj -> Either FrError (FrObj, IO ())}
   | FrNul
 
 instance Eq FrObj where
@@ -90,6 +95,8 @@ data FrExpr
   | FrExDefProcedure [FrVar] [FrPhrase]
   | -- Appel de fonction
     FrExAppelFonc FrExpr [FrExpr]
+  | -- Opérations spéciales
+    FrExOpInfixe FrExpr FrOp FrExpr
 
 data FrPositon = FrDebut | FrFin | FrIdx FrExpr
 
@@ -101,6 +108,7 @@ data FrPhrase
   | FrPhAppelerProc FrExpr [FrExpr]
   | FrPhDefFonction FrVar [FrVar] [FrPhrase]
   | FrPhDefProcedure FrVar [FrVar] [FrPhrase]
+  | FrPhDefOperationInfixe FrOp [FrVar] [FrPhrase]
   | FrPhRetourner FrExpr
   | FrPhSachantQue FrVar FrExpr [FrPhrase]
   | FrPhSachantQueMaintenant FrVar FrExpr [FrPhrase]

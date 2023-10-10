@@ -64,6 +64,10 @@ decimal =
 texte =
   (string "« " <|> string "<< ") *> manyUntil (string " »" <|> string " >>") anyChar
 
+texteOp = symbole "`" *> manyUntil (char '`') anyChar
+
+mot = espaces *> manyUntil espace anyChar
+
 caractere =
   choice
     [ ' ' <$ symbole "espace",
@@ -90,6 +94,7 @@ frObj =
       FrDecimal . read <$> decimal,
       FrTexte <$> texte,
       FrCaractere <$> (symbole "le caractère" *> caractere),
+      FrBool <$> ((True <$ symbole "vrai") <|> (False <$ symbole "faux")),
       FrIdent <$> nomVar
     ]
 
@@ -188,6 +193,7 @@ frExpr =
                    )
             )
         <*> (symbole "Lorsqu'appelée" *> frPhEnum),
+      FrExOpInfixe <$> frExprUnaire <*> choice [texteOp] <*> frExpr,
       -- autre
       frExprUnaire
     ]
@@ -267,6 +273,12 @@ frPhraseIncomplete =
             )
         <*> manyUntil
           (symbole "Fin de la définition de la procédure")
+          frPhrase,
+      FrPhDefOperationInfixe
+        <$> (symbole "début de la définition de l'opération infixe" *> texteOp)
+        <*> (symbole "acceptant les paramètres" *> ((:) <$> nomVar <*> (symbole "et" *> nomVar <&> (: []))) <* symbole ".")
+        <*> manyUntil
+          (symbole "Fin de la définition de l'opération infixe")
           frPhrase,
       FrPhRetourner <$> ((symbole "retourner" *> frExpr) <|> (FrExRien <$ symbole "retourner"))
     ]

@@ -128,7 +128,15 @@ frEvalExpr env (FrExModulo exprG exprD) = do
   g <- frEvalExpr env exprG
   d <- frEvalExpr env exprD
   frMod g d
-
+frEvalExpr env (FrExOpInfixe exprG op exprD) = do
+  (fonc, _) <- case Data.Map.lookup op env of
+    Just result -> Right (result, pure () :: IO ())
+    Nothing -> Left $ FrErrVarInconnue op
+  (g, io) <- frEvalExpr env exprG
+  (d, io') <- frEvalExpr env exprD
+  case appelerOpInfixe fonc g d of
+    Right (obj, io'') -> Right (obj, io >> io' >> io'')
+    Left err -> Left err
 ----- Opération de comparaison -----
 frEvalExpr env (FrExEq exprG exprD) = do
   g <- frEvalExpr env exprG
@@ -304,6 +312,16 @@ frEval env (FrPhDefProcedure nom params corps)
             (Right _, io) -> Right $ applyFrIO io
             (Left (FrCtrlRetourner _), io) -> Right $ applyFrIO io
             (Left err, io) -> Left err
+frEval env (FrPhDefOperationInfixe nom params corps)
+  | member nom env = Left $ FrErrDecl nom "La variable a déjà été déclarée."
+  | otherwise = pure (insert nom fonc env, pure ())
+  where
+    fonc = FrOperationInfixe $ \gauche droite ->
+      let envFonc = foldr1 (<>) $ zipWith (\var val -> insert var val env) params [gauche, droite]
+       in case execPh envFonc corps of
+            (Left (FrCtrlRetourner obj), io) -> Right (obj, applyFrIO io)
+            (Right _, io) -> Left $ FrErrAppelFonction nom "Les opérations doivent retourner une valeur."
+            (Left err, io) -> Left err
 ----- Appel fonction -----
 frEval env (FrPhAppelerProc foncExpr argsExpr) = do
   (fonc, io) <- frEvalExpr env foncExpr
@@ -406,8 +424,6 @@ frErrToString (FrErrBinOp op gauche droite) =
 frErrToString (FrErrOp op obj) = op ++ " " ++ frToString obj
 frErrToString (FrErrVarInconnue var) = var ++ " n'existe pas"
 frErrToString err = "Error"
-
-type FrEnv = Map FrVar FrObj
 
 eval env s =
   case runParser frExpr s 0 of
