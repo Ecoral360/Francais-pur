@@ -1,0 +1,5 @@
+Posons que Deux vaut deux.
+Posons que Cinq vaut cinq.
+
+Imprimer << Hey >>.
+Imprimer << Ho >>.

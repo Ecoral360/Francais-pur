@@ -1,0 +1,6 @@
+Posons que Y vaut cinq.
+
+Sachant que X vaut trois, imprimer X.
+
+Imprimer moins seize.
+

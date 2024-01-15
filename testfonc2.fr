@@ -1,0 +1,13 @@
+Posons que Foo vaut une fonction acceptant le paramètre Bar.
+Lorsqu'appelée: imprimer Bar et retourner Bar plus trois.
+
+Imprimer dix.
+Posons que N vaut le résultat de l'appel à la fonction Foo avec l'argument cinq.
+Imprimer N.
+Appeler la fonction Foo avec l'argument seize.
+
+Posons que X vaut un tableau contenant seulement trois.
+Ajouter deux au début de X.
+Ajouter quatre à la fin de X.
+
+Imprimer X.

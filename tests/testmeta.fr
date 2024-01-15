@@ -1,0 +1,11 @@
+Avant toutes choses,
+inclure tout le contenu du fichier << ./tableau.fr >> et
+inclure Huit et Salut du fichier << ./texte.fr >>.
+
+Imprimer Deux.
+Imprimer Cinq.
+Imprimer Salut.
+Imprimer Huit.
+
+
+

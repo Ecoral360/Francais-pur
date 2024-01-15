@@ -1,0 +1,12 @@
+Posons que Map vaut une fonction acceptant les paramètres Fonc et Tableau. 
+Lorsqu'appelée:
+  posons que NouveauTableau vaut un tableau vide,
+  pour chaque élément E dans Tableau,
+    ajouter le résultat de l'appel à la fonction Fonc avec l'argument E à la fin de NouveauTableau
+  et retourner NouveauTableau.
+
+Posons que PlusUn vaut une fonction acceptant le paramètre N. 
+Lorsqu'appelée, retourner N plus un.
+
+Imprimer le résultat de l'appel à la fonction Map avec les arguments PlusUn et un tableau contenant un, deux, cinq et sept.
+

@@ -1,0 +1,8 @@
+
+Début de la définition de la fonction nommée TailleTxt acceptant le paramètre Txt.
+  Posons que Taille vaut zéro.
+  Pour chaque caractère C dans Txt, maintenant, Taille vaut Taille plus un.
+  Retourner Taille.
+Fin de la définition de la fonction.
+
+

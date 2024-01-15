@@ -8,13 +8,13 @@ case "$ACTION" in
 "rouler")
 	{
 		echo "import Francais"
-		printf 'runFr "%s"' "$CODE"
+		printf 'roulerFr "%s"' "$CODE"
 	} | cabal repl -v0
 	;;
 "asa")
 	{
 		echo "import Francais"
-		printf 'runFr "%s"' "$CODE"
+		printf 'roulerFr "%s"' "$CODE"
 	} | cabal repl -v0
 	;;
 esac

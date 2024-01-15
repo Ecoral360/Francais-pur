@@ -1,0 +1,6 @@
+Posons que Salut vaut << Salut >>.
+Posons que Bye vaut << Bye. >>.
+Posons que Huit vaut cinq.
+
+Imprimer huit.
+Imprimer neuf.

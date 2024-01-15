@@ -472,14 +472,14 @@ frEvalMeta =
     )
     $ pure empty
 
-runFr s = case runParser frMetas s 0 of
+roulerFr s = case runParser frMetas s 0 of
   (Right (_, metas, rest)) -> do
     env <- frEvalMeta metas
     case exec env rest of
       (Right _, io) -> applyFrIO io
       (Left err, io) -> applyFrIO io >> print (frErrToString err)
 
-runFile file = do
-  code <- readFile file
-  runFr code
+roulerFichier fichier = do
+  code <- readFile fichier
+  roulerFr code
 

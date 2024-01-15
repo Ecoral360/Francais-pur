@@ -1,0 +1,9 @@
+Posons que Mot vaut << Salut, toi >>.
+
+Pour chaque caractère C dans Mot,
+imprimer C.
+
+Posons que Tableau vaut un tableau contenant un, deux, trois, << Oui, oui >> et dix.
+Pour chaque élément E dans Tableau,
+imprimer E.
+

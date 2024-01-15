@@ -1,0 +1,8 @@
+Avant toutes choses,
+inclure TailleTxt du fichier << texte.fr >>.
+
+
+Posons que Mot vaut << Bonjour, Monde ! >>.
+Imprimer le résultat de l'appel à la fonction TailleTxt avec l'argument Mot.
+
+

@@ -1,0 +1,9 @@
+Début de la définition de l'opération infixe `est divisible par` acceptant les paramètres Gauche et Droite.
+  Retourner "Gauche modulo Droite" vaut zéro.
+Fin de la définition de l'opération infixe.
+
+Imprimer 25 `est divisible par` cinq.
+
+Imprimer neuf `est divisible par` deux.
+
+Consulter l'utilisateur.

@@ -1,0 +1,6 @@
+Posons que X vaut dix.
+
+Tant que X vaut plus ou autant que moins deux: 
+    imprimer X 
+    et maintenant, X vaut X moins un.
+

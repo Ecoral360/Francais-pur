@@ -1,0 +1,9 @@
+Posons que X vaut trois.
+Posons que Y vaut quatre.
+
+Si X vaut Y, posons que Z vaut << Salut >>.
+Sinon, si X vaut moins que Y: posons que Z vaut << A >> et imprimer << B >>.
+Sinon, imprimer << Yeah >>.
+
+Imprimer Z.
+

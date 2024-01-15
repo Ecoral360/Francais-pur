@@ -152,8 +152,8 @@ frExpr =
             FrExModulo gauche <$> (symbole "modulo" *> frExpr),
             FrExExposant gauche <$> (symbole "exposant" *> frExpr),
             -- comparaison
-            FrExEq gauche <$> (symbole "vaut" *> frExpr),
-            FrExNEq gauche <$> (symbole "ne vaut pas" *> frExpr),
+            FrExEq gauche <$> (symbole "équivaut" *> frExpr),
+            FrExNEq gauche <$> (symbole "n'équivaut pas" *> frExpr),
             FrExPlusQue gauche <$> (symbole "vaut plus que" *> frExpr),
             FrExMoinsQue gauche <$> (symbole "vaut moins que" *> frExpr),
             FrExMoinsEq gauche <$> (symbole "vaut moins ou autant que" *> frExpr),

@@ -1,0 +1,10 @@
+Début de la définition de la fonction nommée EstCurzon acceptant le paramètre N.
+  Posons que X vaut "deux exposant N" plus un.
+  Posons que Y vaut "deux fois N" plus un.
+  Retourner "X modulo Y" vaut zéro.
+Fin de la définition de la fonction.
+
+Imprimer l'appel à la fonction EstCurzon avec l'argument cinq.
+Imprimer l'appel à la fonction EstCurzon avec l'argument dix.
+Imprimer l'appel à la fonction EstCurzon avec l'argument quatorze.
+
