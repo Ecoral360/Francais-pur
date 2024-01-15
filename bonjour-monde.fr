@@ -1,4 +1,7 @@
 Posons que Salutation vaut « Bonjour, monde ! ».
 
-Imprimer Salutation.
+Posons que N vaut zéro.
+Tant que N vaut moins que dix: 
+    imprimer N 
+    et maintenant, N vaut N plus un.
 
