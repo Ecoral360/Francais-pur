@@ -77,12 +77,15 @@ caractere =
     ]
 
 nomVar =
-  (:)
-    <$> satisfy isUpperCase
-    <*> collect
-      [ many lettre,
-        many $ choice [lettre, chiffre]
-      ]
+  choice
+    [ (:)
+        <$> satisfy isUpperCase
+        <*> collect
+          [ many lettre,
+            many $ choice [lettre, chiffre]
+          ],
+      string "actuelle"
+    ]
 
 enumNomVar = frEnumeration nomVar
 
@@ -152,8 +155,8 @@ frExpr =
             FrExModulo gauche <$> (symbole "modulo" *> frExpr),
             FrExExposant gauche <$> (symbole "exposant" *> frExpr),
             -- comparaison
-            FrExEq gauche <$> (symbole "équivaut" *> frExpr),
-            FrExNEq gauche <$> (symbole "n'équivaut pas" *> frExpr),
+            FrExEq gauche <$> (symbole "équivaut à" *> frExpr),
+            FrExNEq gauche <$> (symbole "n'équivaut pas à" *> frExpr),
             FrExPlusQue gauche <$> (symbole "vaut plus que" *> frExpr),
             FrExMoinsQue gauche <$> (symbole "vaut moins que" *> frExpr),
             FrExMoinsEq gauche <$> (symbole "vaut moins ou autant que" *> frExpr),

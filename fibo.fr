@@ -1,6 +1,7 @@
-Début de la définition de la fonction nommée Fibo acceptant le paramètre N.
-    Si N vaut un, retourner N. 
-    Sinon, retourner N fois le résultat de l'appel à la fonction Fibo avec l'argument N moins un.
-Fin de la définition de la fonction.
+Posons que Fibo vaut une fonction acceptant le paramètre N.
+Lorsqu'appelée,
+    si N équivaut à un, retourner un.
+    Sinon, retourner N fois le résultat de l'appel à la fonction actuelle avec l'argument N moins un.
 
 Imprimer le résultat de l'appel à la fonction Fibo avec l'argument cinq.
+

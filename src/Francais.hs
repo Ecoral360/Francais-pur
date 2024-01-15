@@ -220,15 +220,16 @@ frEvalExpr env (FrExAppelFonc foncExpr argsExpr) = do
     Right (obj, io') -> Right (obj, io >> applyFrIO ios >> io')
     Left err -> Left err
 frEvalExpr env (FrExDefFonction params corps) =
-  pure
-    ( FrFonction $ \args ->
-        let envFonc = foldr1 (<>) $ zipWith (\var val -> insert var val env) params args
+  let actuelle = FrFonction $ \args ->
+        let envFonc = foldr1 (<>) $ zipWith (\var val -> insert var val env) (params ++ ["actuelle"]) (args ++ [actuelle])
          in case execPh envFonc corps of
               (Left (FrCtrlRetourner obj), io) -> Right (obj, applyFrIO io)
               (Right _, io) -> Left $ FrErrAppelFonction "anonyme" "Les fonctions doivent retourner une valeur."
-              (Left err, io) -> Left err,
-      pure ()
-    )
+              (Left err, io) -> Left err
+   in pure
+        ( actuelle,
+          pure ()
+        )
 
 ------ Eval de phrase ------
 frEval :: FrEnv -> FrPhrase -> Either FrError (FrEnv, IO ())
@@ -482,4 +483,3 @@ roulerFr s = case runParser frMetas s 0 of
 roulerFichier fichier = do
   code <- readFile fichier
   roulerFr code
-
