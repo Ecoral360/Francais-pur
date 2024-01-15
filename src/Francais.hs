@@ -478,3 +478,8 @@ runFr s = case runParser frMetas s 0 of
     case exec env rest of
       (Right _, io) -> applyFrIO io
       (Left err, io) -> applyFrIO io >> print (frErrToString err)
+
+runFile file = do
+  code <- readFile file
+  runFr code
+
